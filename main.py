@@ -1,12 +1,12 @@
 import argparse
 import json
 import logging
+import os
 import threading
 from dataclasses import dataclass
 from time import sleep
 
 import kubernetes
-import kubernetes.dynamic.exceptions
 from kubernetes import watch
 
 logging.basicConfig(
@@ -50,11 +50,14 @@ def watch_metrics() -> None:
     """
     # TODO: See if we can use Kube's watch
     def _watch():
-        while True:
-            for hpa in list(HPAs.values()):
-                update_target(hpa)
-
-            sleep(SYNC_INTERVAL)
+        try:
+            while True:
+                for hpa in list(HPAs.values()):
+                    update_target(hpa)
+                sleep(SYNC_INTERVAL)
+        except Exception as exc:
+            LOGGER.exception(f"Exiting because of: {exc}")
+            os._exit(1)
 
     threading.Thread(target=_watch, daemon=True).start()
 
@@ -134,16 +137,14 @@ def get_needed_replicas(metric_value_path) -> int | None:
         metric_value = DYNAMIC.request("GET", metric_value_path).items[0].value
         return min(int(metric_value), 1)
     except kubernetes.client.exceptions.ApiException as exc:
-        if exc.status == 404:
-            LOGGER.info(f"Custom metric at {metric_value_path} was not found.")
-            return
-        raise exc
-    except (
-        kubernetes.dynamic.exceptions.ServiceUnavailableError,
-        kubernetes.dynamic.exceptions.UnauthorizedError,
-    ) as exc:
-        LOGGER.exception(f"An exception was caught: {exc}")
-        return
+        match exc.status:
+            case 404 | 503 | 403:
+                LOGGER.exception(
+                    f"Could not get Custom metric at {metric_value_path}: {exc}"
+                )
+                return
+            case _:
+                raise exc
 
 
 def update_target(hpa: HPA) -> None:

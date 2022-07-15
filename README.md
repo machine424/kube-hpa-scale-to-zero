@@ -1,6 +1,6 @@
 # kube-hpa-scale-to-zero
 
-Simulate the [HPAScaleToZero](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) feature gate on managed Kubernetes clusters,
+Simulate the [HPAScaleToZero](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) feature gate, especially for managed Kubernetes clusters,
 as they don't usually support non-stable feature gates.
 
 `kube-hpa-scale-to-zero` scales down to `zero` workloads instrumented by HPA when the current
