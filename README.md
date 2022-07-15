@@ -4,7 +4,9 @@ Simulate the [HPAScaleToZero](https://kubernetes.io/docs/reference/command-line-
 as they don't usually support non-stable feature gates.
 
 `kube-hpa-scale-to-zero` scales down to `zero` workloads instrumented by HPA when the current
-value of the used custom metric is `zero`.
+value of the used _custom_ metric is `zero`.
+
+If you're also tired of (big) Pods (thus Nodes) that are only used 3 hours a day, give this a try ;)
 
 Check the code and comments in [main.py](./main.py) for more details.
 
