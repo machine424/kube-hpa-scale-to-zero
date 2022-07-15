@@ -16,23 +16,6 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(
-    description="kube-hpa-scale-to-zero. Check https://github.com/machine424/kube-hpa-scale-to-zero"
-)
-parser.add_argument(
-    "--hpa-label-selector",
-    dest="hpa_label_selector",
-    default="",
-    help="label_selector to get HPA to watch, 'foo=bar,bar=foo' e.g. (default: empty string to select all)",
-)
-parser.add_argument(
-    "--hpa-namespace",
-    dest="hpa_namespace",
-    default="default",
-    help="namespace where the HPA live. (default: 'default' namespace)",
-)
-ARGS = parser.parse_args()
-
 
 def load_kubernetes_config() -> None:
     try:
@@ -73,17 +56,17 @@ def watch_metrics() -> None:
     threading.Thread(target=_watch, daemon=True).start()
 
 
-def watch_hpa() -> None:
+def watch_hpa(args) -> None:
     LOGGER.info(
-        f"Will watch HPA with label selector '{ARGS.hpa_label_selector}' in {ARGS.hpa_namespace}."
+        f"Will watch HPA with label selector '{args.hpa_label_selector}' in {args.hpa_namespace}."
     )
     while True:
         try:
             w = watch.Watch()
             for event in w.stream(
                 AUTOSCALING_V1.list_namespaced_horizontal_pod_autoscaler,
-                ARGS.hpa_namespace,
-                label_selector=ARGS.hpa_label_selector,
+                args.hpa_namespace,
+                label_selector=args.hpa_label_selector,
             ):
                 update_hpa(event["object"].metadata)
         except kubernetes.client.exceptions.ApiException as exc:
@@ -207,6 +190,27 @@ def update_deployment(*, namespace, name, needed_replicas) -> None:
         raise exc
 
 
+def parse_cli_args():
+    parser = argparse.ArgumentParser(
+        description="kube-hpa-scale-to-zero. Check https://github.com/machine424/kube-hpa-scale-to-zero"
+    )
+    parser.add_argument(
+        "--hpa-namespace",
+        dest="hpa_namespace",
+        default="default",
+        help="namespace where the HPA live. (default: 'default' namespace)",
+    )
+    parser.add_argument(
+        "--hpa-label-selector",
+        dest="hpa_label_selector",
+        default="",
+        help="label_selector to get HPA to watch, 'foo=bar,bar=foo' e.g. (default: empty string to select all)",
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    cli_args = parse_cli_args()
     watch_metrics()
-    watch_hpa()
+    watch_hpa(cli_args)

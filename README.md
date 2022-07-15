@@ -16,8 +16,12 @@ or
 
 `python main.py --help`
 
+Needs Python `>=3.10`
+
 ### Deploy
 
 Docker images are published [here](https://hub.docker.com/r/machine424/kube-hpa-scale-to-zero).
 
-A Helm chart is also available [here](). (Coming soon)
+A Helm chart is also available [here](./helm-chart).
+
+`helm upgrade --install RELEASE_NAME helm-chart/ -n RELEASE_NAMESPACE`
