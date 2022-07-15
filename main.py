@@ -45,6 +45,9 @@ _LOCK = threading.Lock()
 
 
 def watch_metrics() -> None:
+    """
+    periodically watches metrics of HPA in HPAs and scale the targets accordingly if needed.
+    """
     # TODO: See if we can use Kube's watch
     def _watch():
         while True:
@@ -75,6 +78,9 @@ def watch_hpa(args) -> None:
 
 
 def update_hpa(metadata) -> None:
+    """
+    inserts/updates/deletes the HPA to/in/from HPAs.
+    """
     hpa_namespace, hpa_name = metadata.namespace, metadata.name
     namespaced_name = f"{hpa_namespace}/{hpa_name}"
     try:
@@ -100,6 +106,9 @@ def update_hpa(metadata) -> None:
 
 
 def build_metric_value_path(hpa) -> str:
+    """
+    returns the Kube API path to retrieve the custom.metrics.k8s.io used metric.
+    """
     metrics = json.loads(
         hpa.metadata.annotations["autoscaling.alpha.kubernetes.io/metrics"]
     )
@@ -117,6 +126,10 @@ def build_metric_value_path(hpa) -> str:
 
 
 def get_needed_replicas(metric_value_path) -> int | None:
+    """
+    returns 0 if the metric value is 0, and 1 otherwise (HPA will take care of scaling up if needed)
+    returns None, if the needed replicas cannot be determined.
+    """
     try:
         metric_value = DYNAMIC.request("GET", metric_value_path).items[0].value
         return min(int(metric_value), 1)
@@ -143,7 +156,7 @@ def update_target(hpa: HPA) -> None:
     # Maybe, be more precise (using target_api_version e.g.?)
     match hpa.target_kind:
         case "Deployment":
-            update_deployment(
+            scale_deployment(
                 namespace=hpa.namespace,
                 name=hpa.target_name,
                 needed_replicas=needed_replicas,
@@ -153,6 +166,9 @@ def update_target(hpa: HPA) -> None:
 
 
 def update_replicas(*, current_replicas, needed_replicas) -> bool:
+    """
+    checks if the scale up/down is relevant.
+    """
     # Maybe scale to 0 even if needed_replicas == 0, in case
     # Maybe do not scale down if HPA unable to retrieve metrics? leave the current only pod do some work
     if (needed_replicas == current_replicas) or (
@@ -162,7 +178,10 @@ def update_replicas(*, current_replicas, needed_replicas) -> bool:
     return True
 
 
-def update_deployment(*, namespace, name, needed_replicas) -> None:
+def scale_deployment(*, namespace, name, needed_replicas) -> None:
+    """
+    scales up/down the Deployment if needed.
+    """
     app_v1 = CLIENTS.setdefault("app/v1", kubernetes.client.AppsV1Api())
     try:
         scale = app_v1.read_namespaced_deployment_scale(namespace=namespace, name=name)
