@@ -1,0 +1,30 @@
+name: Release Chart
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.MY_PAT }}
+      - name: Configure Git
+        run: |
+          git config user.name "machine424"
+          git config user.email "ayoubmrini424@gmail.com"
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.10.3
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.4.1
+        with:
+          charts_dir: deploy
+        env:
+          CR_TOKEN: "${{ secrets.MY_PAT }}"
