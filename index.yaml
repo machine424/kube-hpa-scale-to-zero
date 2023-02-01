@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  kube-hpa-scale-to-zero:
+  - apiVersion: v2
+    appVersion: 0.2.1
+    created: "2023-02-01T12:47:54.696103815Z"
+    description: See https://github.com/machine424/kube-hpa-scale-to-zero
+    digest: 0c3bea06d02793631da398319ad86725690e6186a3ddc83cf4bd8d62d4012472
+    name: kube-hpa-scale-to-zero
+    type: application
+    urls:
+    - https://github.com/machine424/kube-hpa-scale-to-zero/releases/download/kube-hpa-scale-to-zero-0.2.1/kube-hpa-scale-to-zero-0.2.1.tgz
+    version: 0.2.1
+generated: "2023-02-01T12:47:54.696111315Z"
