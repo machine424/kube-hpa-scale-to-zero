@@ -17,7 +17,7 @@ jobs:
         with:
           images: machine424/kube-hpa-scale-to-zero
           tags: |
-            type=match,pattern=kube-hpa-scale-to-zero-(.*),group=1,prefix=v
+            type=match,pattern=kube-hpa-scale-to-zero-(.*),group=1
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
