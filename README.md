@@ -1,5 +1,8 @@
 # kube-hpa-scale-to-zero
 
+![docker](https://github.com/machine424/kube-hpa-scale-to-zero/actions/workflows/docker.yaml/badge.svg)
+![helm](https://github.com/machine424/kube-hpa-scale-to-zero/actions/workflows/helm.yaml/badge.svg)
+
 Simulate the [HPAScaleToZero](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) feature gate, especially for managed Kubernetes clusters,
 as they don't usually support non-stable feature gates.
 
