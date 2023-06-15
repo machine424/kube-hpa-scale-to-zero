@@ -124,8 +124,13 @@ def build_metric_value_path(hpa) -> str:
     service_namespace = hpa.metadata.namespace
     service_name = target["name"]
     metric_name = custom_metric["metricName"]
-
-    return f"apis/custom.metrics.k8s.io/v1beta1/namespaces/{service_namespace}/services/{service_name}/{metric_name}"
+    selector = ""
+    if "selector" in custom_metric:
+        for key, val in custom_metric["selector"].get("matchLabels", {}).items():
+            selector += f"&{key}%3D{val}"  # `=` Needs to be URLencoded for raw query
+    if len(selector) != 0:
+        selector = f"?metricLabelSelector={selector[1:]}"  # Drop the first `&`
+    return f"apis/custom.metrics.k8s.io/v1beta1/namespaces/{service_namespace}/services/{service_name}/{metric_name}{selector}"
 
 
 def get_needed_replicas(metric_value_path) -> int | None:
