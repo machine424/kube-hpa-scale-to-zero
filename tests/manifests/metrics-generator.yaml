@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-generator
+  labels:
+    app: metrics-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-generator
+  template:
+    metadata:
+      labels:
+        app: metrics-generator
+        foo_metric_value: "0"
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+      - name: metrics-generator
+        image: python:3.10-slim-bullseye
+        ports:
+          - containerPort: 8000
+        env:
+          - name: FOO_METRIC_VALUE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['foo_metric_value']
+        command: ['bash', '-c', 'pip install prometheus-client && python -c "$0"']
+        args:
+          - |
+            import os
+            from prometheus_client import start_http_server, Gauge
+
+            foo_metric = Gauge("foo_metric", "foo_metric", ["namespace", "service", "foo"])
+            start_http_server(8000)
+            foo_metric.labels(namespace="default", service="metrics-generator", foo="foo").set(os.environ["FOO_METRIC_VALUE"])
+            foo_metric.labels(namespace="default", service="metrics-generator", foo="bar").set(0)
+            while True:
+                pass
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-generator
+spec:
+  selector:
+    app: metrics-generator
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000

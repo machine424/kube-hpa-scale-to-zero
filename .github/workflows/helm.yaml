@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+# When the versions in Chart.yaml change, this will publish a new Chart via a tag
+# which will trigger docker.yaml to publish the docker image.
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -20,8 +23,6 @@ jobs:
           git config user.email "ayoubmrini424@gmail.com"
       - name: Install Helm
         uses: azure/setup-helm@v3
-        with:
-          version: v3.10.3
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.4.1
         with:

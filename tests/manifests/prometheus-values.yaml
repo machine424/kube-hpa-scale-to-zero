@@ -1,0 +1,22 @@
+alertmanager:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+
+server:
+  readinessProbeInitialDelay: 5
+  livenessProbeInitialDelay: 5
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+    - job_name: metrics-generator
+      scrape_interval: 5s
+      scrape_timeout: 3s
+      static_configs:
+        - targets:
+          - metrics-generator:8000

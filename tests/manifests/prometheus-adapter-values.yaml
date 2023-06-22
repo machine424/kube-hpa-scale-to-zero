@@ -1,0 +1,22 @@
+prometheus:
+  url: http://prometheus-server
+  port: 80
+
+metricsRelistInterval: 5s
+
+livenessProbe:
+  initialDelaySeconds: 5
+readinessProbe:
+  initialDelaySeconds: 5
+
+rules:
+  default: false
+  custom:
+    - seriesQuery: 'foo_metric{namespace!="", service!=""}'
+      name:
+        as: "foo_metric"
+      resources:
+        overrides:
+          service: {resource: "service"}
+          namespace: {resource: "namespace"}
+      metricsQuery: "sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)"

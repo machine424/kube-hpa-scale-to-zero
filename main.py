@@ -26,8 +26,8 @@ def load_kubernetes_config() -> None:
 
 load_kubernetes_config()
 AUTOSCALING_V1 = kubernetes.client.AutoscalingV1Api()
+APP_V1 = kubernetes.client.AppsV1Api()
 DYNAMIC = kubernetes.dynamic.DynamicClient(kubernetes.client.api_client.ApiClient())
-CLIENTS = {}
 
 
 @dataclass(slots=True, kw_only=True)
@@ -41,14 +41,14 @@ class HPA:
 
 SYNC_INTERVAL = 30
 HPAs: dict[str, HPA] = {}
-_LOCK = threading.Lock()
 
 
 def watch_metrics() -> None:
     """
-    periodically watches metrics of HPA in HPAs and scale the targets accordingly if needed.
+    periodically watches metrics of HPA and scale the targets accordingly if needed.
     """
-    # TODO: See if we can use Kube's watch
+
+    # TODO: See if we can use Kubernetes's watch mechanism
     def _watch():
         try:
             while True:
@@ -63,9 +63,7 @@ def watch_metrics() -> None:
 
 
 def watch_hpa(args) -> None:
-    LOGGER.info(
-        f"Will watch HPA with label selector '{args.hpa_label_selector}' in {args.hpa_namespace}."
-    )
+    LOGGER.info(f"Will watch HPA with {args.hpa_label_selector=} in {args.hpa_namespace=}.")
     while True:
         try:
             w = watch.Watch()
@@ -87,39 +85,34 @@ def update_hpa(metadata) -> None:
     hpa_namespace, hpa_name = metadata.namespace, metadata.name
     namespaced_name = f"{hpa_namespace}/{hpa_name}"
     try:
-        hpa = AUTOSCALING_V1.read_namespaced_horizontal_pod_autoscaler(
-            namespace=hpa_namespace, name=hpa_name
-        )
-        hpa = HPA(
+        hpa = AUTOSCALING_V1.read_namespaced_horizontal_pod_autoscaler(namespace=hpa_namespace, name=hpa_name)
+        HPAs[namespaced_name] = HPA(
             name=hpa_name,
             namespace=hpa_namespace,
             metric_value_path=build_metric_value_path(hpa),
             target_kind=hpa.spec.scale_target_ref.kind,
             target_name=hpa.spec.scale_target_ref.name,
         )
-        with _LOCK:
-            HPAs[namespaced_name] = hpa
     except kubernetes.client.exceptions.ApiException as exc:
-        if exc.status == 404:
-            LOGGER.info(f"HPA {hpa_namespace}/{hpa_name} was not found.")
-            with _LOCK:
-                HPAs.pop(namespaced_name, None)
-            return
-        raise exc
+        if exc.status != 404:
+            raise exc
+        LOGGER.info(f"HPA {hpa_namespace}/{hpa_name} was not found, will forget about it.")
+        HPAs.pop(namespaced_name, None)
 
 
 def build_metric_value_path(hpa) -> str:
     """
     returns the Kube API path to retrieve the custom.metrics.k8s.io used metric.
     """
-    metrics = json.loads(
-        hpa.metadata.annotations["autoscaling.alpha.kubernetes.io/metrics"]
-    )
-    # Only supports ONE CUSTOM metric without selector based on service for now.
-    custom_metric = next(m["object"] for m in metrics if m["type"] == "Object")
-    target = custom_metric["target"]
-    assert target["kind"] == "Service"
-    assert not target.get("selector")
+    metrics = json.loads(hpa.metadata.annotations["autoscaling.alpha.kubernetes.io/metrics"])
+    try:
+        custom_metric = next(m["object"] for m in metrics if m["type"] == "Object")
+        assert not custom_metric.get("selector")
+        target = custom_metric["target"]
+        assert target["kind"] == "Service"
+    except (StopIteration, AssertionError) as e:
+        LOGGER.exception("Only supports ONE CUSTOM metric without selector based on service for now.")
+        raise e
 
     service_namespace = hpa.metadata.namespace
     service_name = target["name"]
@@ -134,15 +127,12 @@ def get_needed_replicas(metric_value_path) -> int | None:
     returns None, if the needed replicas cannot be determined.
     """
     try:
-        metric_value = DYNAMIC.request("GET", metric_value_path).items[0].value
-        return min(int(metric_value), 1)
+        # We suppose the MetricValueList does contain one item
+        return min(int(DYNAMIC.request("GET", metric_value_path).items[0].value), 1)
     except kubernetes.client.exceptions.ApiException as exc:
         match exc.status:
             case 404 | 503 | 403:
-                LOGGER.exception(
-                    f"Could not get Custom metric at {metric_value_path}: {exc}"
-                )
-                return
+                LOGGER.exception(f"Could not get Custom metric at {metric_value_path}: {exc}")
             case _:
                 raise exc
 
@@ -150,9 +140,7 @@ def get_needed_replicas(metric_value_path) -> int | None:
 def update_target(hpa: HPA) -> None:
     needed_replicas = get_needed_replicas(hpa.metric_value_path)
     if needed_replicas is None:
-        LOGGER.info(
-            f"Will not update {hpa.target_kind} {hpa.namespace}/{hpa.target_name}."
-        )
+        LOGGER.error(f"Will not update {hpa.target_kind} {hpa.namespace}/{hpa.target_name}.")
         return
     # Maybe, be more precise (using target_api_version e.g.?)
     match hpa.target_kind:
@@ -166,48 +154,30 @@ def update_target(hpa: HPA) -> None:
             raise ValueError("Only support Deployment as HPA target for now.")
 
 
-def update_replicas(*, current_replicas, needed_replicas) -> bool:
+def scaling_is_needed(*, current_replicas, needed_replicas) -> bool:
     """
     checks if the scale up/down is relevant.
     """
-    # Maybe scale to 0 even if needed_replicas == 0, in case
-    # Maybe do not scale down if HPA unable to retrieve metrics? leave the current only pod do some work
-    if (needed_replicas == current_replicas) or (
-        needed_replicas == 1 and current_replicas > 0
-    ):
-        return False
-    return True
+    # Maybe do not scale down if the HPA is unable to retrieve metrics? leave the current only pod do some work
+    return bool(current_replicas) != bool(needed_replicas)
 
 
 def scale_deployment(*, namespace, name, needed_replicas) -> None:
-    """
-    scales up/down the Deployment if needed.
-    """
-    app_v1 = CLIENTS.setdefault("app/v1", kubernetes.client.AppsV1Api())
     try:
-        scale = app_v1.read_namespaced_deployment_scale(namespace=namespace, name=name)
+        scale = APP_V1.read_namespaced_deployment_scale(namespace=namespace, name=name)
         current_replicas = scale.status.replicas
-        if not update_replicas(
-            current_replicas=current_replicas, needed_replicas=needed_replicas
-        ):
-            LOGGER.info(
-                f"No need to scale Deployment {namespace}/{name} {current_replicas}->{needed_replicas}."
-            )
+        if not scaling_is_needed(current_replicas=current_replicas, needed_replicas=needed_replicas):
+            LOGGER.info(f"No need to scale Deployment {namespace}/{name} {current_replicas=} {needed_replicas=}.")
             return
 
         scale.spec.replicas = needed_replicas
         # Maybe do not scale immediately? but don't want to reimplement an HPA.
-        app_v1.patch_namespaced_deployment_scale(
-            namespace=namespace, name=name, body=scale
-        )
-        LOGGER.info(
-            f"Deployment {namespace}/{name} scaled {current_replicas}->{needed_replicas}."
-        )
+        APP_V1.patch_namespaced_deployment_scale(namespace=namespace, name=name, body=scale)
+        LOGGER.info(f"Deployment {namespace}/{name} was scaled {current_replicas=}->{needed_replicas=}.")
     except kubernetes.client.exceptions.ApiException as exc:
-        if exc.status == 404:
-            LOGGER.info(f"Deployment {namespace}/{name} was not found.")
-            return
-        raise exc
+        if exc.status != 404:
+            raise exc
+        LOGGER.warning(f"Deployment {namespace}/{name} was not found.")
 
 
 def parse_cli_args():
