@@ -1,5 +1,6 @@
 # kube-hpa-scale-to-zero
 
+![ci](https://github.com/machine424/kube-hpa-scale-to-zero/actions/workflows/test.yaml/badge.svg)
 ![docker](https://github.com/machine424/kube-hpa-scale-to-zero/actions/workflows/docker.yaml/badge.svg)
 ![helm](https://github.com/machine424/kube-hpa-scale-to-zero/actions/workflows/helm.yaml/badge.svg)
 
@@ -30,5 +31,9 @@ Docker images are published [here](https://hub.docker.com/r/machine424/kube-hpa-
 
 ```bash
 # python main.py --help
-python main.py --hpa-label-selector foo=bar,bar=foo --hpa-namespace foo`
+python main.py --hpa-label-selector foo=bar,bar=foo --hpa-namespace foo
 ```
+
+### Test
+
+Check [test.yaml](./.github/workflows/test.yaml) for how tests are run in CI.

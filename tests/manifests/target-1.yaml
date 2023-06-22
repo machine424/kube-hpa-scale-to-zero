@@ -1,0 +1,45 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: target-1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: target-1
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Object
+    object:
+      metric:
+        name: foo_metric
+      describedObject:
+        apiVersion: "/v1"
+        kind: Service
+        name: metrics-generator
+      target:
+        type: Value
+        value: 1
+
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: target-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: target-1
+  template:
+    metadata:
+      labels:
+        app: target-1
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+      - name: nginx
+        image: nginx:latest
