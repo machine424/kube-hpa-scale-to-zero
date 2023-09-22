@@ -121,7 +121,7 @@ def test_target_1(setup):
 
     deploy_target(f"{target_name}.yaml")
 
-    # The intial replicas count is 1
+    # The initial replicas count is 1
     wait_deployment_scale(name=target_name, replicas=1)
 
     khstz = run_scaler()
