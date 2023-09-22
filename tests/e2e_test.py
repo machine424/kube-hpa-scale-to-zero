@@ -133,7 +133,7 @@ def test_target_1(setup):
         # Increase the metric value
         set_foo_metric_value(10)
 
-        # The deloyment was revived anf the HPA was able to scale it up
+        # The deloyment was revived and the HPA was able to scale it up
         wait_deployment_scale(name=target_name, replicas=3)
     finally:
         khstz.kill()
