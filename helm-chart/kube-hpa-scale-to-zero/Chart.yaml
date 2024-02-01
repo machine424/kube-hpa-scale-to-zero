@@ -2,5 +2,5 @@ apiVersion: v2
 name: kube-hpa-scale-to-zero
 description: See https://github.com/machine424/kube-hpa-scale-to-zero
 type: application
-version: 0.3.0
-appVersion: "0.3.0"
+version: 0.4.0
+appVersion: "0.4.0"

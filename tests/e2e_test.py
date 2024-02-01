@@ -43,6 +43,7 @@ def setup():
                 "prometheus-community/prometheus",
                 "--values",
                 f"{MANIFESTS_PATH}/prometheus-values.yaml",
+                "--wait",
             ]
         )
         run(
@@ -57,32 +58,20 @@ def setup():
             ]
         )
 
-        run(command=["kubectl", "apply", "-f", f"{MANIFESTS_PATH}/metrics-generator.yaml"])
+        run(command=["kubectl", "apply", "-f", f"{MANIFESTS_PATH}/metrics-generator.yaml", "--wait=true"])
         yield
     finally:
-        run(
-            command=[
-                "helm",
-                "delete",
-                "prometheus",
-            ]
-        )
-        run(
-            command=[
-                "helm",
-                "delete",
-                "prometheus-adapter",
-            ]
-        )
-        run(command=["kubectl", "delete", "-f", f"{MANIFESTS_PATH}/metrics-generator.yaml"])
+        run(command=["helm", "delete", "prometheus", "--wait"])
+        run(command=["helm", "delete", "prometheus-adapter", "--wait"])
+        run(command=["kubectl", "delete", "-f", f"{MANIFESTS_PATH}/metrics-generator.yaml", "--wait=true"])
 
 
 def deploy_target(manifest: str):
-    run(command=["kubectl", "apply", "-f", f"{MANIFESTS_PATH}/{manifest}"])
+    run(command=["kubectl", "apply", "-f", f"{MANIFESTS_PATH}/{manifest}", "--wait=true"])
 
 
 def delete_target(manifest: str):
-    run(command=["kubectl", "delete", "-f", f"{MANIFESTS_PATH}/{manifest}"])
+    run(command=["kubectl", "delete", "-f", f"{MANIFESTS_PATH}/{manifest}", "--wait=true"])
 
 
 def run_scaler():
@@ -103,38 +92,39 @@ def set_foo_metric_value(value: int):
     run(command=["kubectl", "rollout", "status", "deployment", "metrics-generator"])
 
 
-def wait_deployment_scale(*, name: str, replicas: int):
+def wait_scale(*, kind: str, name: str, replicas: int):
     run(
         command=[
             "kubectl",
             "wait",
             f"--for=jsonpath={{.spec.replicas}}={replicas}",
-            "deployment",
+            kind,
             name,
             f"--timeout={TIMEOUT}s",
         ]
     )
 
 
-def test_target_1(setup):
-    target_name = "target-1"
+@pytest.mark.parametrize("target_name, kind", [("target-1", "deployment"), ("target-2", "statefulset")])
+def test_target(setup, target_name: str, kind: str):
+    set_foo_metric_value(0)
 
     deploy_target(f"{target_name}.yaml")
 
     # The intial replicas count is 1
-    wait_deployment_scale(name=target_name, replicas=1)
+    wait_scale(kind=kind, name=target_name, replicas=1)
 
     khstz = run_scaler()
 
     try:
         # The initial metric value is 0, it should scale the target to 0
-        wait_deployment_scale(name=target_name, replicas=0)
+        wait_scale(kind=kind, name=target_name, replicas=0)
 
         # Increase the metric value
         set_foo_metric_value(10)
 
         # The deloyment was revived anf the HPA was able to scale it up
-        wait_deployment_scale(name=target_name, replicas=3)
+        wait_scale(kind=kind, name=target_name, replicas=3)
     finally:
         khstz.kill()
         delete_target(f"{target_name}.yaml")
