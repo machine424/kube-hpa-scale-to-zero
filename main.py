@@ -150,8 +150,14 @@ def update_target(hpa: HPA) -> None:
                 name=hpa.target_name,
                 needed_replicas=needed_replicas,
             )
+        case "StatefulSet":
+            scale_statefulset(
+                namespace=hpa.namespace,
+                name=hpa.target_name,
+                needed_replicas=needed_replicas,
+            )
         case _:
-            raise ValueError("Only support Deployment as HPA target for now.")
+            raise ValueError(f"Target kind {hpa.target_kind} not supported.")
 
 
 def scaling_is_needed(*, current_replicas, needed_replicas) -> bool:
@@ -178,6 +184,24 @@ def scale_deployment(*, namespace, name, needed_replicas) -> None:
         if exc.status != 404:
             raise exc
         LOGGER.warning(f"Deployment {namespace}/{name} was not found.")
+
+
+def scale_statefulset(*, namespace, name, needed_replicas) -> None:
+    try:
+        scale = APP_V1.read_namespaced_stateful_set_scale(namespace=namespace, name=name)
+        current_replicas = scale.status.replicas
+        if not scaling_is_needed(current_replicas=current_replicas, needed_replicas=needed_replicas):
+            LOGGER.info(f"No need to scale statefulset {namespace}/{name} {current_replicas=} {needed_replicas=}.")
+            return
+
+        scale.spec.replicas = needed_replicas
+        # Maybe do not scale immediately? but don't want to reimplement an HPA.
+        APP_V1.patch_namespaced_stateful_set_scale(namespace=namespace, name=name, body=scale)
+        LOGGER.info(f"StatefulSet {namespace}/{name} was scaled {current_replicas=}->{needed_replicas=}.")
+    except kubernetes.client.exceptions.ApiException as exc:
+        if exc.status != 404:
+            raise exc
+        LOGGER.warning(f"StatefulSet {namespace}/{name} was not found.")
 
 
 def parse_cli_args():
