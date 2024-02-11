@@ -32,6 +32,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: {{ include "kube-hpa-scale-to-zero.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
