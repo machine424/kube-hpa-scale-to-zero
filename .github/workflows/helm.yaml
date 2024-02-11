@@ -24,8 +24,9 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v3
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.4.1
+        uses: helm/chart-releaser-action@v1.6.0
         with:
           charts_dir: helm-chart
+          skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.MY_PAT }}"
