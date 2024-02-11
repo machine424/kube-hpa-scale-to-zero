@@ -23,9 +23,12 @@ Check the code and comments in [main.py](./main.py) for more details.
 helm repo add kube-hpa-scale-to-zero https://machine424.github.io/kube-hpa-scale-to-zero
 helm install RELEASE_NAME kube-hpa-scale-to-zero/kube-hpa-scale-to-zero -n RELEASE_NAMESPACE
 ```
+
+See [here](https://github.com/machine424/kube-hpa-scale-to-zero/tree/gh-pages) for more details.
+
 - Run the docker image:
 
-Docker images are published [here](https://hub.docker.com/r/machine424/kube-hpa-scale-to-zero).
+Docker images are published [here](https://hub.docker.com/r/machine424/kube-hpa-scale-to-zero/tags).
 
 - Or clone the repo and run (needs Python `>=3.10`):
 
