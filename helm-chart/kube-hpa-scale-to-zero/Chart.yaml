@@ -2,6 +2,6 @@ apiVersion: v2
 name: kube-hpa-scale-to-zero
 description: See https://github.com/machine424/kube-hpa-scale-to-zero
 type: application
-# Please Do not change this, it'll be done during the release.
+# Please DO NOT change the versions, it'll be done during the release.
 version: 0.4.0
 appVersion: "0.4.0"
